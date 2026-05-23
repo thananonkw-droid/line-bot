@@ -42,7 +42,6 @@ app.post("/webhook", async (req, res) => {
 
     for (const event of events) {
 
-      // รับเฉพาะข้อความรูปภาพ
       if (
         event.type === "message" &&
         event.message.type === "image"
@@ -85,10 +84,7 @@ app.post("/webhook", async (req, res) => {
         const result =
           await Tesseract.recognize(
             filePath,
-            "tha+eng",
-            {
-              logger: m => console.log(m),
-            }
+            "tha+eng"
           );
 
         const text =
@@ -98,21 +94,32 @@ app.post("/webhook", async (req, res) => {
         console.log(text);
 
         // =========================
-        // แยกข้อความ
+        // ทำความสะอาดข้อความ
         // =========================
-        const cleanText =
-          text.replace(/\r/g, "");
+        const cleanText = text
+          .replace(/\r/g, "")
+          .replace(/\n/g, " ");
 
+        // =========================
         // หาเลขทะเบียน
+        // ตัวอย่าง:
+        // กข 1234
+        // 1กข1234
+        // =========================
         const plateMatch =
           cleanText.match(
-            /([ก-ฮ]{1,3}\s?[0-9]{1,4})/
+            /([0-9]?[ก-ฮ]{1,3}\s?[0-9]{1,4})/
           );
 
+        // =========================
         // หาวันหมดอายุ
+        // ตัวอย่าง:
+        // 12 ม.ค. 2568
+        // 1 มกราคม 2568
+        // =========================
         const expireMatch =
           cleanText.match(
-            /([0-9]{1,2}\s?[ก-ฮ]+\s?[0-9]{2,4})/
+            /([0-9]{1,2}\s?(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s?[0-9]{2,4})/
           );
 
         const ทะเบียน =
@@ -154,10 +161,9 @@ app.post("/webhook", async (req, res) => {
         );
 
         // =========================
-        // ลบรูปทิ้ง
+        // ลบรูป
         // =========================
         fs.unlinkSync(filePath);
-
       }
     }
 

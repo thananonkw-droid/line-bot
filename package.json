@@ -18,5 +18,14 @@
         "express": "^5.2.1",
         "googleapis": "^172.0.0",
         "tesseract.js": "^7.0.0"
-    }
+    },
+    "devDependencies": {},
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/thananonkw-droid/line-bot.git"
+    },
+    "bugs": {
+        "url": "https://github.com/thananonkw-droid/line-bot/issues"
+    },
+    "homepage": "https://github.com/thananonkw-droid/line-bot#readme"
 }
