@@ -8,17 +8,20 @@ const app = express();
 
 app.use(express.json());
 
+// LINE TOKEN
 const CHANNEL_ACCESS_TOKEN =
   "dR0JGAVhuY3Pk9iK5iMfjdgZnZfxlekkwKEZsxn/EDsNLJyHEjk1d6Qx9PRJujHLXs4tSvsP40BxIJH12m0mUsmHzriwIxl6z0HIw5p7rK7nxJmZCfX6TR6WpepIehR6ceriSUpCeztaylutZjowqgdB04t89/1O/w1cDnyilFU=";
 
+// GOOGLE SHEET ID
 const spreadsheetId =
   "1nE5hTVN0MFrvD3-mHsy0PcjRqmSDPA2RwUVh6y9ubec";
 
-// Google Sheets
+// GOOGLE CREDENTIALS
 const credentials = JSON.parse(
   process.env.GOOGLE_CREDENTIALS
 );
 
+// GOOGLE AUTH
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: [
@@ -26,6 +29,7 @@ const auth = new google.auth.GoogleAuth({
   ],
 });
 
+// WEBHOOK
 app.post("/webhook", async (req, res) => {
 
   const events = req.body.events;
@@ -45,15 +49,18 @@ app.post("/webhook", async (req, res) => {
         // โหลดรูปจาก LINE
         const imageResponse = await axios({
           method: "get",
-          url: `https://api-data.line.me/v2/bot/message/${messageId}/content`,
+          url:
+            `https://api-data.line.me/v2/bot/message/${messageId}/content`,
           responseType: "arraybuffer",
           headers: {
-            Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+            Authorization:
+              `Bearer ${CHANNEL_ACCESS_TOKEN}`,
           },
         });
 
         // เซฟรูป
-        const filePath = `image-${messageId}.jpg`;
+        const filePath =
+          `image-${messageId}.jpg`;
 
         fs.writeFileSync(
           filePath,
@@ -66,7 +73,7 @@ app.post("/webhook", async (req, res) => {
         const result =
           await Tesseract.recognize(
             filePath,
-            "tha+eng"
+            "eng"
           );
 
         const text =
@@ -75,13 +82,30 @@ app.post("/webhook", async (req, res) => {
         console.log("อ่านข้อความได้:");
         console.log(text);
 
-        // แยกข้อมูลแบบง่าย
-        const lines = text.split("\n");
+        // หาเลขปี พ.ศ.
+        const ปีMatch =
+          text.match(/25\d{2}/);
 
-        const ทะเบียน = lines[0] || "";
-        const หมดอายุ = lines[1] || "";
+        const หมดอายุ =
+          ปีMatch
+            ? ปีMatch[0]
+            : "ไม่พบ";
 
-        // Google Sheets
+        // หาเลขทะเบียน
+        const ทะเบียนMatch =
+          text.match(
+            /[A-Z0-9ก-ฮ]{1,3}\s?[0-9]{1,4}/
+          );
+
+        const ทะเบียน =
+          ทะเบียนMatch
+            ? ทะเบียนMatch[0]
+            : "ไม่พบ";
+
+        console.log("ทะเบียน:", ทะเบียน);
+        console.log("หมดอายุ:", หมดอายุ);
+
+        // GOOGLE SHEETS
         const sheets = google.sheets({
           version: "v4",
           auth,
@@ -105,6 +129,9 @@ app.post("/webhook", async (req, res) => {
           "บันทึกลง Google Sheets แล้ว"
         );
 
+        // ลบรูปหลังใช้งาน
+        fs.unlinkSync(filePath);
+
       } catch (error) {
 
         console.log("ERROR:");
@@ -117,10 +144,12 @@ app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 });
 
+// TEST
 app.get("/", (req, res) => {
   res.send("LINE BOT RUNNING");
 });
 
+// START SERVER
 app.listen(3000, () => {
   console.log("Server running");
 });
