@@ -14,14 +14,16 @@ const spreadsheetId =
   "1nE5hTVN0MFrvD3-mHsy0PcjRqmSDPA2RwUVh6y9ubec";
 
 // Google Sheets
+const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+
 const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
+  credentials,
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
 // Vision API
 const visionClient = new vision.ImageAnnotatorClient({
-  keyFilename: "credentials.json",
+  credentials,
 });
 
 app.post("/webhook", async (req, res) => {
