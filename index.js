@@ -6,22 +6,24 @@ const Tesseract = require("tesseract.js");
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
+// =========================
 // LINE TOKEN
+// =========================
 const CHANNEL_ACCESS_TOKEN =
-  "dR0JGAVhuY3Pk9iK5iMfjdgZnZfxlekkwKEZsxn/EDsNLJyHEjk1d6Qx9PRJujHLXs4tSvsP40BxIJH12m0mUsmHzriwIxl6z0HIw5p7rK7nxJmZCfX6TR6WpepIehR6ceriSUpCeztaylutZjowqgdB04t89/1O/w1cDnyilFU=";
+  process.env.CHANNEL_ACCESS_TOKEN;
 
-// GOOGLE SHEET ID
+// =========================
+// GOOGLE SHEETS
+// =========================
 const spreadsheetId =
   "1nE5hTVN0MFrvD3-mHsy0PcjRqmSDPA2RwUVh6y9ubec";
 
-// GOOGLE CREDENTIALS
 const credentials = JSON.parse(
   process.env.GOOGLE_CREDENTIALS
 );
 
-// GOOGLE AUTH
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: [
@@ -29,24 +31,30 @@ const auth = new google.auth.GoogleAuth({
   ],
 });
 
+// =========================
 // WEBHOOK
+// =========================
 app.post("/webhook", async (req, res) => {
 
-  const events = req.body.events;
+  try {
 
-  for (const event of events) {
+    const events = req.body.events;
 
-    // รับเฉพาะรูป
-    if (
-      event.type === "message" &&
-      event.message.type === "image"
-    ) {
+    for (const event of events) {
 
-      const messageId = event.message.id;
+      // รับเฉพาะข้อความรูปภาพ
+      if (
+        event.type === "message" &&
+        event.message.type === "image"
+      ) {
 
-      try {
+        const messageId = event.message.id;
 
+        console.log("ได้รับรูปแล้ว");
+
+        // =========================
         // โหลดรูปจาก LINE
+        // =========================
         const imageResponse = await axios({
           method: "get",
           url:
@@ -58,9 +66,11 @@ app.post("/webhook", async (req, res) => {
           },
         });
 
-        // เซฟรูป
+        // =========================
+        // เซฟไฟล์ชั่วคราว
+        // =========================
         const filePath =
-          `image-${messageId}.jpg`;
+          `/tmp/image-${messageId}.jpg`;
 
         fs.writeFileSync(
           filePath,
@@ -69,11 +79,16 @@ app.post("/webhook", async (req, res) => {
 
         console.log("เซฟรูปแล้ว");
 
-        // OCR อ่านข้อความ
+        // =========================
+        // OCR
+        // =========================
         const result =
           await Tesseract.recognize(
             filePath,
-            "eng"
+            "tha+eng",
+            {
+              logger: m => console.log(m),
+            }
           );
 
         const text =
@@ -82,36 +97,45 @@ app.post("/webhook", async (req, res) => {
         console.log("อ่านข้อความได้:");
         console.log(text);
 
-        // หาเลขปี พ.ศ.
-        const ปีMatch =
-          text.match(/25\d{2}/);
-
-        const หมดอายุ =
-          ปีMatch
-            ? ปีMatch[0]
-            : "ไม่พบ";
+        // =========================
+        // แยกข้อความ
+        // =========================
+        const cleanText =
+          text.replace(/\r/g, "");
 
         // หาเลขทะเบียน
-        const ทะเบียนMatch =
-          text.match(
-            /[A-Z0-9ก-ฮ]{1,3}\s?[0-9]{1,4}/
+        const plateMatch =
+          cleanText.match(
+            /([ก-ฮ]{1,3}\s?[0-9]{1,4})/
+          );
+
+        // หาวันหมดอายุ
+        const expireMatch =
+          cleanText.match(
+            /([0-9]{1,2}\s?[ก-ฮ]+\s?[0-9]{2,4})/
           );
 
         const ทะเบียน =
-          ทะเบียนMatch
-            ? ทะเบียนMatch[0]
-            : "ไม่พบ";
+          plateMatch
+            ? plateMatch[0]
+            : "ไม่พบทะเบียน";
+
+        const หมดอายุ =
+          expireMatch
+            ? expireMatch[0]
+            : "ไม่พบวันหมดอายุ";
 
         console.log("ทะเบียน:", ทะเบียน);
         console.log("หมดอายุ:", หมดอายุ);
 
-        // GOOGLE SHEETS
+        // =========================
+        // Google Sheets
+        // =========================
         const sheets = google.sheets({
           version: "v4",
           auth,
         });
 
-        // บันทึกลงชีต
         await sheets.spreadsheets.values.append({
           spreadsheetId,
           range: "Sheet1!A:C",
@@ -120,7 +144,7 @@ app.post("/webhook", async (req, res) => {
             values: [[
               ทะเบียน,
               หมดอายุ,
-              new Date().toLocaleString(),
+              new Date().toLocaleString("th-TH"),
             ]],
           },
         });
@@ -129,27 +153,38 @@ app.post("/webhook", async (req, res) => {
           "บันทึกลง Google Sheets แล้ว"
         );
 
-        // ลบรูปหลังใช้งาน
+        // =========================
+        // ลบรูปทิ้ง
+        // =========================
         fs.unlinkSync(filePath);
-
-      } catch (error) {
-
-        console.log("ERROR:");
-        console.log(error);
 
       }
     }
-  }
 
-  res.sendStatus(200);
+    res.sendStatus(200);
+
+  } catch (error) {
+
+    console.log("ERROR:");
+    console.log(error);
+
+    res.sendStatus(500);
+  }
 });
 
-// TEST
+// =========================
+// TEST ROUTE
+// =========================
 app.get("/", (req, res) => {
   res.send("LINE BOT RUNNING");
 });
 
+// =========================
 // START SERVER
-app.listen(3000, () => {
+// =========================
+const PORT =
+  process.env.PORT || 3000;
+
+app.listen(PORT, () => {
   console.log("Server running");
 });
